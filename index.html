@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>HTML转图片工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            min-height: 100vh;
+        }
+
+        .left-panel {
+            flex: 1;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-panel {
+            flex: 2;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-weight: bold;
+        }
+
+        #htmlInput {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .dimension-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #downloadBtn {
+            padding: 12px 24px;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #downloadBtn:hover {
+            background: #0051a2;
+        }
+
+        #preview {
+            border: 1px solid #ddd;
+            width: fit-content;
+            height: fit-content;
+            margin: 0 auto;
+        }
+    </style>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="input-group">
+                <label>HTML 代码:</label>
+                <textarea 
+                    id="htmlInput" 
+                    placeholder="请在此输入HTML代码，示例：
+
+1. 使用默认尺寸(800x600)：
+<div style=&quot;background: #f0f0f0; padding: 20px;&quot;>
+    Hello World!
+</div>
+
+2. 自定义尺寸：
+<div style=&quot;width: 500px; height: 300px; background: #f0f0f0; padding: 20px;&quot;>
+    Hello World!
+</div>
+
+注意：
+- 如果HTML代码中包含width和height样式，将自动更新预览区域尺寸
+- 也可以通过下方的输入框手动调整尺寸
+- 如果使用外部图片，请确保图片允许跨域访问(支持CORS)"
+                ><div style="background: #f0f0f0; padding: 20px;">Hello World!</div></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label>宽度:</label>
+                <input type="number" id="widthInput" class="dimension-input" value="800">
+            </div>
+
+            <div class="input-group">
+                <label>高度:</label>
+                <input type="number" id="heightInput" class="dimension-input" value="600">
+            </div>
+
+            <button id="downloadBtn">下载图片</button>
+        </div>
+
+        <div class="right-panel">
+            <div id="preview"></div>
+        </div>
+    </div>
+
+    <script>
+        const htmlInput = document.getElementById('htmlInput');
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        const preview = document.getElementById('preview');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        function extractDimensions(htmlString) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlString;
+            const element = div.firstChild;
+            
+            // 检查内联样式
+            if (element && element.style) {
+                const styleWidth = element.style.width;
+                const styleHeight = element.style.height;
+                
+                const width = styleWidth ? parseInt(styleWidth) : null;
+                const height = styleHeight ? parseInt(styleHeight) : null;
+                
+                return {
+                    width: width || 800,  // 如果没有找到宽度，使用默认值800
+                    height: height || 600  // 如果没有找到高度，使用默认值600
+                };
+            }
+            
+            return { width: 800, height: 600 }; // 默认值
+        }
+
+        function updatePreview() {
+            const dimensions = extractDimensions(htmlInput.value);
+            
+            // 更新输入框的值
+            widthInput.value = dimensions.width;
+            heightInput.value = dimensions.height;
+            
+            // 更新预览区域的尺寸
+            preview.style.minWidth = `${dimensions.width}px`;
+            preview.style.minHeight = `${dimensions.height}px`;
+            preview.innerHTML = htmlInput.value;
+            
+            // 处理预览中的图片
+            const images = preview.getElementsByTagName('img');
+            Array.from(images).forEach(img => {
+                img.crossOrigin = 'anonymous';
+            });
+        }
+
+        // 初始化预览
+        updatePreview();
+
+        // 监听输入变化
+        htmlInput.addEventListener('input', updatePreview);
+        
+        // 手动修改宽高输入框时的处理
+        widthInput.addEventListener('input', () => {
+            preview.style.minWidth = `${widthInput.value}px`;
+        });
+        
+        heightInput.addEventListener('input', () => {
+            preview.style.minHeight = `${heightInput.value}px`;
+        });
+
+        // 下载功能
+        downloadBtn.addEventListener('click', async () => {
+            try {
+                // 等待所有图片加载完成
+                const images = preview.getElementsByTagName('img');
+                await Promise.all(Array.from(images).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                }));
+
+                const canvas = await html2canvas(preview, {
+                    width: parseInt(widthInput.value),
+                    height: parseInt(heightInput.value),
+                    scale: 1,
+                    useCORS: true,  // 允许跨域
+                    allowTaint: true,  // 允许跨域图片
+                    logging: true,  // 启用日志以便调试
+                    imageTimeout: 0,  // 禁用图片加载超时
+                    onclone: function(clonedDoc) {
+                        // 确保克隆的文档中的图片也已加载
+                        const clonedImages = clonedDoc.getElementsByTagName('img');
+                        Array.from(clonedImages).forEach(img => {
+                            img.crossOrigin = 'anonymous';
+                        });
+                    }
+                });
+                
+                const link = document.createElement('a');
+                link.download = 'preview.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            } catch (error) {
+                console.error('下载图片时出错:', error);
+                alert('下载图片时出错：\n1. 请确保图片链接可以正常访问\n2. 如果使用外部图片，请确保图片允许跨域访问\n3. 请检查控制台获取详细信息');
+            }
+        });
+    </script>
+</body>
+</html> 
