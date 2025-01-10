@@ -46,13 +46,22 @@
             gap: 8px;
         }
 
+        .dimensions-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .dimension-item {
+            flex: 1;
+        }
+
         .input-group label {
             font-weight: bold;
         }
 
         #htmlInput {
             width: 100%;
-            height: 200px;
+            height: 300px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -112,17 +121,18 @@
 - 如果HTML代码中包含width和height样式，将自动更新预览区域尺寸
 - 也可以通过下方的输入框手动调整尺寸
 - 如果使用外部图片，请确保图片允许跨域访问(支持CORS)"
-                ><div style="background: #f0f0f0; padding: 20px;">Hello World!</div></textarea>
+                ></textarea>
             </div>
             
-            <div class="input-group">
-                <label>宽度:</label>
-                <input type="number" id="widthInput" class="dimension-input" value="800">
-            </div>
-
-            <div class="input-group">
-                <label>高度:</label>
-                <input type="number" id="heightInput" class="dimension-input" value="600">
+            <div class="dimensions-group">
+                <div class="dimension-item">
+                    <label>宽度:</label>
+                    <input type="number" id="widthInput" class="dimension-input" value="800">
+                </div>
+                <div class="dimension-item">
+                    <label>高度:</label>
+                    <input type="number" id="heightInput" class="dimension-input" value="600">
+                </div>
             </div>
 
             <button id="downloadBtn">下载图片</button>
@@ -182,7 +192,20 @@
         }
 
         // 初始化预览
+        const defaultHtml = '<div style="background: #f0f0f0; padding: 20px;">Hello World!</div>';
+        htmlInput.value = defaultHtml;
         updatePreview();
+
+        // 添加一个标记，记录是否是第一次点击
+        let isFirstFocus = true;
+        
+        // 监听输入框获得焦点事件
+        htmlInput.addEventListener('focus', () => {
+            if (isFirstFocus) {
+                htmlInput.value = '';  // 清空内容
+                isFirstFocus = false;  // 标记已经不是第一次点击了
+            }
+        });
 
         // 监听输入变化
         htmlInput.addEventListener('input', updatePreview);
@@ -209,14 +232,26 @@
                     });
                 }));
 
+                // 根据尺寸动态计算缩放比例，确保图片清晰度
+                const width = parseInt(widthInput.value);
+                const height = parseInt(heightInput.value);
+                let scale = 1;
+                
+                // 如果尺寸较小，增加缩放比例
+                if (width < 500 || height < 500) {
+                    scale = Math.max(2, Math.min(4, Math.ceil(500 / Math.min(width, height))));
+                }
+
                 const canvas = await html2canvas(preview, {
                     width: parseInt(widthInput.value),
                     height: parseInt(heightInput.value),
-                    scale: 1,
+                    scale: scale,  // 使用动态计算的缩放比例
                     useCORS: true,  // 允许跨域
                     allowTaint: true,  // 允许跨域图片
                     logging: true,  // 启用日志以便调试
                     imageTimeout: 0,  // 禁用图片加载超时
+                    backgroundColor: null,  // 保持背景透明
+                    removeContainer: true,  // 提高渲染质量
                     onclone: function(clonedDoc) {
                         // 确保克隆的文档中的图片也已加载
                         const clonedImages = clonedDoc.getElementsByTagName('img');
@@ -228,7 +263,7 @@
                 
                 const link = document.createElement('a');
                 link.download = 'preview.png';
-                link.href = canvas.toDataURL();
+                link.href = canvas.toDataURL('image/png', 1.0);  // 使用最高质量
                 link.click();
             } catch (error) {
                 console.error('下载图片时出错:', error);
